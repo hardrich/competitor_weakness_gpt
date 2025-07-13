@@ -1,0 +1,1 @@
+# competitor_weakness_gpt
