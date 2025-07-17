@@ -1,0 +1,152 @@
+[
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "quality",
+      "design",
+      "material"
+    ],
+    "theme": "Material"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "clamp",
+      "spring",
+      "durability"
+    ],
+    "theme": "Functionality"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "attachment",
+      "screw",
+      "fit"
+    ],
+    "theme": "Compatibility"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "quality",
+      "material",
+      "loose"
+    ],
+    "theme": "Performance"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "clip",
+      "durability"
+    ],
+    "theme": "Functionality"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "durability"
+    ],
+    "theme": "Performance"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "locks",
+      "clips",
+      "material"
+    ],
+    "theme": "Material"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "clips",
+      "flimsy",
+      "durability"
+    ],
+    "theme": "Functionality"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "design",
+      "security"
+    ],
+    "theme": "Design"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "hook",
+      "screw",
+      "tightening"
+    ],
+    "theme": "Functionality"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "screws",
+      "loose"
+    ],
+    "theme": "Maintenance"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "leather",
+      "rivets",
+      "durability"
+    ],
+    "theme": "Material"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "stretching",
+      "loose",
+      "material"
+    ],
+    "theme": "Material"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "loud",
+      "mobility",
+      "design"
+    ],
+    "theme": "Design"
+  },
+  {
+    "sentiment": "Positive",
+    "weaknesses": [],
+    "theme": "Price"
+  },
+  {
+    "sentiment": "Neutral",
+    "weaknesses": [
+      "material",
+      "removal",
+      "mechanism"
+    ],
+    "theme": "Functionality"
+  },
+  {
+    "sentiment": "Negative",
+    "weaknesses": [
+      "hook",
+      "durability"
+    ],
+    "theme": "Functionality"
+  },
+  {
+    "sentiment": "Neutral",
+    "weaknesses": [
+      "thin straps"
+    ],
+    "theme": "Material"
+  }
+]

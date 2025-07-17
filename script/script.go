@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -12,32 +13,38 @@ import (
 	genai "cloud.google.com/go/vertexai/genai"
 )
 
-const promptTemplate = `You are an expert e-commerce product review analyst. Your task is to analyze a given product review and return a JSON object strictly adhering to the specified structure and rules.
+type Review struct {
+	ReviewerID     string  `json:"reviewerID"`
+	ASIN           string  `json:"asin"`
+	ReviewerName   string  `json:"reviewerName"`
+	ReviewText     string  `json:"reviewText"`
+	Overall        float64 `json:"overall"`
+	UnixReviewTime int64   `json:"unixReviewTime"` // Using int64 for Unix timestamp
+	ReviewTime     string  `json:"reviewTime"`
+}
 
-Here are the strict rules for your analysis and JSON output:
+const promptHeader = `You are an expert e-commerce product review analyst. Your task is to analyze a batch of product reviews and return a JSON array. Each item in the array must strictly follow this schema:
 
-- **sentiment**: A single enumerated value: "Positive", "Negative", or "Neutral". This should reflect the overall tone and customer satisfaction expressed in the review.
-- **weaknesses**: A list containing up to 3 (three) lowercase keywords. These keywords must represent the primary issues, flaws, or negative aspects explicitly mentioned in the review. If no clear weaknesses are identified, this list must be empty ([]).
-- **theme**: A single, singular keyword representing the main category of the feedback or issue. Choose from the following options. Select the most relevant one. If the review is generally positive with no specific issues, or if the primary theme doesn't fit any of these, use "General".
+{
+  "sentiment": "Positive" | "Negative" | "Neutral",
+  "weaknesses": [up to 3 lowercase keywords],
+  "theme": "Shipping" | "Material" | "Functionality" | "Performance" | "Price" | "Support" | "Design" | "Experience" | "Compatibility" | "Accuracy" | "Maintenance" | "Assembly" | "General"
+}
 
-    * **Shipping**: Problems related to delivery, packaging, delays, or received condition (e.g., damaged box, late arrival).
-    * **Material**: Issues concerning the physical composition, build quality, durability, or integrity of the product (e.g., "cheap plastic," "broke easily," "thin fabric").
-    * **Functionality**: Problems with how the product operates, performs its intended purpose, or its features (e.g., "doesn't charge," "button sticks," "software glitch," "didn't work").
-    * **Performance**: Related to efficiency, speed, effectiveness, or power output (e.g., "slow," "not powerful enough," "battery drains fast").
-    * **Price**: Comments on the cost, value for money, or affordability of the product (e.g., "too expensive," "not worth the price," "great value").
-    * **Support**: Issues with customer service, warranty, returns, or technical assistance (e.g., "bad customer service," "no reply," "difficult return").
-    * **Design**: Feedback on the aesthetics, ergonomics, user-friendliness, or appearance (e.g., "ugly," "uncomfortable," "clunky design").
-    * **Experience**: Pertains to the overall user interaction, ease of use, setup process, or unboxing (e.g., "hard to set up," "complicated," "smooth experience").
-    * **Compatibility**: Problems with the product working with other devices, systems, or requirements (e.g., "doesn't fit," "not compatible with iOS").
-    * **Accuracy**: Issues where the product description, specifications, or advertised features do not match the actual product (e.g., "wrong color," "smaller than described," "misleading image").
-    * **Maintenance**: Difficulties with cleaning, upkeep, or long-term care of the product (e.g., "hard to clean," "requires constant maintenance").
-    * **Assembly**: Challenges related to putting the product together (e.g., "difficult to assemble," "missing parts").
-    * **General**: For overwhelmingly positive reviews without specific issues, or for issues that don't fit well into the other categories.
+### Rules:
+- Analyze **each review independently**.
+- Return a **strictly valid JSON array**, where each item corresponds to the same index of the input list.
+- Do not include any explanation or extra formatting.
+- If no weaknesses are found, use an empty array for "weaknesses".
+- Choose the most fitting theme from the list. If not sure, use "General".
 
-Ensure the output is strictly a valid JSON object and nothing else. Do not include any explanatory text or conversational elements outside the JSON.
+### Reviews:
+`
 
-**Review to analyze:**
-%s`
+const (
+	reviewsFilePath = "mapped.json"
+	outputFilePath  = "analyzed_reviews_batch.json"
+)
 
 func main() {
 	err := godotenv.Load()
@@ -48,8 +55,34 @@ func main() {
 	projectID := os.Getenv("GCP_PROJECT_ID")
 	location := os.Getenv("GCP_LOCATION")
 
-	reviewText := "The product stopped working after two days. The packaging was also damaged."
-	prompt := fmt.Sprintf(promptTemplate, reviewText)
+	fileContent, err := os.ReadFile(reviewsFilePath)
+	if err != nil {
+		log.Fatalf("Error reading reviews file %s, %v", reviewsFilePath, err)
+	}
+
+	var reviews []Review
+	err = json.Unmarshal(fileContent, &reviews)
+	if err != nil {
+		log.Fatalf("Error unmarshaling reviews json: %v", err)
+	}
+
+	log.Printf("Successfully loaded %d reviews from %s\n", len(reviews), reviewsFilePath)
+
+	// Construir el cuerpo del prompt con múltiples reseñas
+	var sb strings.Builder
+	sb.WriteString(promptHeader)
+	for i, r := range reviews {
+		sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, r.ReviewText))
+	}
+
+	prompt := sb.String()
+
+	log.Printf("Prompt %s\n", prompt)
+
+	// Recomendación: limitar el número de reseñas si es muy largo
+	if len(prompt) > 25000 {
+		log.Fatalf("Prompt is too long (%d characters), reduce number of reviews", len(prompt))
+	}
 
 	ctx := context.Background()
 
@@ -66,11 +99,29 @@ func main() {
 		log.Fatalf("Error generating content: %v", err)
 	}
 
-	var responseBuilder strings.Builder
+	var output strings.Builder
 	for _, part := range resp.Candidates[0].Content.Parts {
-		responseBuilder.WriteString(fmt.Sprintf("%v", part))
+		output.WriteString(fmt.Sprintf("%v", part))
 	}
 
-	fmt.Println("Response JSON:")
-	fmt.Println(responseBuilder.String())
+	// Limpiar Markdown como ```json ... ```
+	outputStr := output.String()
+	outputStr = strings.TrimSpace(outputStr)
+	outputStr = strings.TrimPrefix(outputStr, "```json")
+	outputStr = strings.TrimPrefix(outputStr, "```")
+	outputStr = strings.TrimSuffix(outputStr, "```")
+	outputStr = strings.TrimSpace(outputStr)
+
+	// Validar que sea JSON válido
+	var jsonCheck interface{}
+	if err := json.Unmarshal([]byte(outputStr), &jsonCheck); err != nil {
+		log.Fatalf("Invalid JSON: %v\nContent:\n%s", err, outputStr)
+	}
+
+	// Guardar en archivo
+	if err := os.WriteFile(outputFilePath, []byte(outputStr), 0644); err != nil {
+		log.Fatalf("Error writing output file: %v", err)
+	}
+
+	log.Printf("✅ Analyzed reviews saved: %s\n", outputFilePath)
 }
