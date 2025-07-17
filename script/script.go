@@ -2,18 +2,19 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"log"
-	"os"
-	"sync"
+    "encoding/json"
+    "fmt"
+    "log"
+    "os"
+    "sync"
 
-	// Google Cloud AI Platform (Vertex AI) SDK for Gemini API
-	genai "cloud.google.com/go/aiplatform/apiv1beta1"
-	genaipb "cloud.google.com/go/aiplatform/apiv1beta1/aiplatformpb"
-	"github.com/joho/godotenv" // For loading .env file
-	"google.golang.org/api/option"
-	"google.golang.org/protobuf/types/known/structpb"
+    "github.com/joho/godotenv" // For loading .env file
+    "google.golang.org/api/option"
+
+    // The correct import for the Generative Language API *client*
+    genai "cloud.google.com/go/generativelanguage/apiv1beta"
+    // The correct import for the Generative Language API *protobuf types*
+    genai_pb "cloud.google.com/genproto/googleapis/cloud/generativelanguage/v1beta/generativelanguagepb"
 )
 
 // Review represents the structure of a single review in your JSON file.
@@ -21,10 +22,8 @@ type Review struct {
 	ReviewerID     string  `json:"reviewerID"`
 	ASIN           string  `json:"asin"`
 	ReviewerName   string  `json:"reviewerName"`
-	Helpful        []int   `json:"helpful"`
 	ReviewText     string  `json:"reviewText"`
 	Overall        float64 `json:"overall"`
-	Summary        string  `json:"summary"`
 	UnixReviewTime int64   `json:"unixReviewTime"` // Using int64 for Unix timestamp
 	ReviewTime     string  `json:"reviewTime"`
 }
@@ -44,10 +43,10 @@ type ReviewWithAnalysis struct {
 }
 
 const (
-	reviewsFilePath       = "reviews.json"         // Path to your input JSON file
-	batchSize             = 5                      // Number of reviews to process in each batch
-	maxParallelGoRoutines = 10                     // Max concurrent API requests
-	geminiModelID         = "gemini-1.5-flash-001" // Or "gemini-1.0-pro-001"
+	reviewsFilePath       = "mapped.json"    // Path to your input JSON file
+	batchSize             = 5                // Number of reviews to process in each batch
+	maxParallelGoRoutines = 10               // Max concurrent API requests
+	geminiModelID         = "gemini-2.5-pro" // Or "gemini-1.0-pro-001"
 	// Adjust based on your region; 'us-central1' is common.
 	apiEndpoint = "us-central1-aiplatform.googleapis.com:443"
 )
@@ -149,10 +148,10 @@ func main() {
 		log.Fatalf("Error loading .env file, ensure it exists and contains GEMINI_API_KEY: %v", err)
 	}
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		log.Fatal("GEMINI_API_KEY not found in environment variables. Please set it.")
-	}
+	// apiKey := os.Getenv("GEMINI_API_KEY")
+	// if apiKey == "" {
+	// 	log.Fatal("GEMINI_API_KEY not found in environment variables. Please set it.")
+	// }
 
 	// Read reviews from JSON file
 	fileContent, err := os.ReadFile(reviewsFilePath)
@@ -170,7 +169,7 @@ func main() {
 
 	// Initialize Gemini client
 	ctx := context.Background()
-	client, err := genai.NewPredictionClient(ctx, option.WithEndpoint(apiEndpoint), option.WithAPIKey(apiKey))
+	client, err := genai.NewPredictionClient(ctx, option.WithEndpoint(apiEndpoint))
 	if err != nil {
 		log.Fatalf("Failed to create Gemini client: %v", err)
 	}
@@ -204,12 +203,12 @@ func main() {
 				defer wg.Done()
 				defer func() { <-sem }() // Release the slot when goroutine finishes
 
-				log.Printf("  Analyzing review: %s (ID: %s)\n", r.Summary, r.ReviewerID)
+				log.Printf("  Analyzing review: %s (ID: %s)\n", r.ReviewText, r.ReviewerID)
 				analysis, err := analyzeReview(ctx, client, projectID, locationID, r.ReviewText)
 
 				analyzedReview := ReviewWithAnalysis{Review: r}
 				if err != nil {
-					log.Printf("    Error analyzing review %s: %v\n", r.Summary, err)
+					log.Printf("    Error analyzing review %s: %v\n", r.ReviewText, err)
 					analyzedReview.Error = err.Error()
 				} else {
 					analyzedReview.AnalysisResult = analysis
